@@ -79,15 +79,21 @@
 					"navigationBarTitleText": "场内详情",
 					"enablePullDownRefresh": false
 				}
-			}, {
-				"path": "orderList/orderList",
-				"style": {
-					"navigationBarTitleText": "历史订单",
-					"enablePullDownRefresh": false
-				}
-			}]
-		}
-	],
+                        }, {
+                                "path": "orderList/orderList",
+                                "style": {
+                                        "navigationBarTitleText": "历史订单",
+                                        "enablePullDownRefresh": false
+                                }
+                        }, {
+                                "path": "appeal/appeal",
+                                "style": {
+                                        "navigationBarTitleText": "订单申诉",
+                                        "enablePullDownRefresh": false
+                                }
+                        }]
+                }
+        ],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "uni-app",
