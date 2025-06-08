@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.BizOrderMapper">
+    
+    <resultMap type="BizOrder" id="BizOrderResult">
+        <result property="id" column="id"/>
+        <result property="parkId" column="park_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="destination" column="destination"/>
+        <result property="duration" column="duration"/>
+        <result property="totalCost" column="total_cost"/>
+        <result property="status" column="status"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="selectOrderVo">
+        select id, park_id, user_id, destination, duration, total_cost, status, create_time, update_time
+        from t_order
+    </sql>
+
+    <select id="selectOrderList" resultMap="BizOrderResult">
+        <include refid="selectOrderVo"/>
+        order by create_time desc
+    </select>
+
+    <select id="selectOrdersByUserId" parameterType="Long" resultMap="BizOrderResult">
+        <include refid="selectOrderVo"/>
+        where user_id = #{userId}
+        order by create_time desc
+    </select>
+
+    <select id="selectOrderById" parameterType="Long" resultMap="BizOrderResult">
+        <include refid="selectOrderVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertOrder" parameterType="BizOrder" useGeneratedKeys="true" keyProperty="id">
+        insert into t_order (
+            park_id,
+            user_id,
+            destination,
+            duration,
+            total_cost,
+            status,
+            create_time,
+            update_time
+        ) values (
+            #{parkId},
+            #{userId},
+            #{destination},
+            #{duration},
+            #{totalCost},
+            #{status},
+            #{createTime},
+            #{updateTime}
+        )
+    </insert>
+
+    <update id="updateOrder" parameterType="BizOrder">
+        update t_order
+        <set>
+            <if test="status != null">status = #{status},</if>
+            <if test="updateTime != null">update_time = #{updateTime}</if>
+        </set>
+        where id = #{id}
+    </update>
+</mapper> 

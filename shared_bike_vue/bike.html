@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>单车轨迹</title>
+    <link rel="stylesheet" href="./tm-vuetify/css/tm-vuetify.css">
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak=mQ3PhIX2RXk17pYlXfKZCK1e1UGSW2M2"></script>
+    <script type="text/javascript" src="https://api.map.baidu.com/library/LuShu/1.2/src/LuShu_min.js"></script>
+    <style>
+        .map-container {
+            height: calc(100vh - 120px);
+            width: 100%;
+            position: relative;
+        }
+        .order-list {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+            z-index: 1000;
+            width: 300px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .order-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .order-item:hover {
+            background-color: #f5f7fa;
+        }
+        .order-item.active {
+            border-color: #409EFF;
+            background-color: #ecf5ff;
+        }
+        .filter-box {
+            margin-bottom: 15px;
+        }
+        .route-info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <tm-sheet :margin="[32]" :round="3" :shadow="2">
+            <h2>单车轨迹查看</h2>
+        </tm-sheet>
+
+        <div class="map-container">
+            <!-- 订单列表 -->
+            <div class="order-list">
+<!--                <div class="filter-box">-->
+<!--                    <el-select v-model="queryParams.status" placeholder="订单状态" clearable style="width: 100%">-->
+<!--                        <el-option label="未支付" :value="0"></el-option>-->
+<!--                        <el-option label="已支付" :value="1"></el-option>-->
+<!--                    </el-select>-->
+<!--                </div>-->
+                
+                <div v-for="order in orderList" 
+                     :key="order.id" 
+                     :class="['order-item', selectedOrder && selectedOrder.id === order.id ? 'active' : '']"
+                     @click="selectOrder(order)">
+                    <div><strong>订单号：</strong>{{ order.id }}</div>
+                    <div><strong>起点：</strong>{{ order.startPoint }}</div>
+                    <div><strong>终点：</strong>{{ order.endPoint }}</div>
+                    <div><strong>预计时长：</strong>{{ order.duration }}小时</div>
+                    <div><strong>预计费用：</strong>¥{{ order.estimatedCost }}</div>
+                    <div>
+                        <el-tag size="mini" :type="order.status === 1 ? 'warning' : 'success'">
+                            {{ order.status === 1 ? '未支付' : '已支付' }}
+                        </el-tag>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 路线信息 -->
+<!--            <div class="route-info" v-if="routeInfo">-->
+<!--                <p><strong>预计距离：</strong>{{ routeInfo.distance }}公里</p>-->
+<!--                <p><strong>预计时间：</strong>{{ routeInfo.duration }}分钟</p>-->
+<!--            </div>-->
+
+            <!-- 百度地图容器 -->
+            <div id="map" style="height: 100%; width: 100%;"></div>
+        </div>
+
+        <tm-message ref="toast"></tm-message>
+    </div>
+
+    <script src="./tm-vuetify/js/tm-vuetify.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    map: null,
+                    orderList: [],
+                    selectedOrder: null,
+                    routeInfo: null,
+                    queryParams: {
+                        status: null
+                    },
+                    driving: null,
+                    markers: []
+                }
+            },
+            watch: {
+                'queryParams.status': {
+                    handler(val) {
+                        this.loadOrderList();
+                    }
+                }
+            },
+            mounted() {
+                this.initMap();
+                this.loadOrderList();
+            },
+            methods: {
+                initMap() {
+                    this.map = new BMap.Map("map");
+                    this.map.centerAndZoom(new BMap.Point(108.93, 34.27), 11);
+                    this.map.enableScrollWheelZoom();
+                    this.map.addControl(new BMap.NavigationControl());
+                    this.map.addControl(new BMap.ScaleControl());
+                    
+                    // 初始化驾驶路线规划
+                    this.driving = new BMap.DrivingRoute(this.map, {
+                        renderOptions: {
+                            map: this.map,
+                            autoViewport: true
+                        },
+                        onSearchComplete: results => {
+                            if (results.getNumPlans() > 0) {
+                                const plan = results.getPlan(0);
+                                this.routeInfo = {
+                                    distance: (plan.getDistance(true) / 1000).toFixed(2),
+                                    duration: Math.ceil(plan.getDuration(true) / 60)
+                                };
+                            }
+                        }
+                    });
+                },
+
+                loadOrderList() {
+                    axios.get('http://localhost:8181/order/list', {
+                        params: this.queryParams
+                    }).then(response => {
+                        if (response.data.code === 200) {
+                            this.orderList = response.data.data;
+                            console.log(this.orderList)
+                            if (this.orderList.length > 0 && !this.selectedOrder) {
+                                this.selectOrder(this.orderList[0]);
+                            }
+                        } else {
+                            console.log('获取订单列表失败')
+
+                        }
+                    }).catch(error => {
+                        console.error('获取订单列表失败:', error);
+                        this.$refs.toast.show({
+                            model: 'error',
+                            label: '获取订单列表失败，请检查网络连接'
+                        });
+                    });
+                },
+
+                selectOrder(order) {
+                    this.selectedOrder = order;
+                    this.showRoute(order);
+                },
+
+                showRoute(order) {
+                    this.clearMapOverlays();
+                    const myGeo = new BMap.Geocoder();
+                    
+                    // 解析起点地址
+                    myGeo.getPoint(order.startPoint, startPoint => {
+                        if (startPoint) {
+                            // 解析终点地址
+                            myGeo.getPoint(order.endPoint, endPoint => {
+                                if (endPoint) {
+                                    // 添加起点标记
+                                    const startMarker = new BMap.Marker(startPoint);
+                                    this.map.addOverlay(startMarker);
+                                    startMarker.setLabel(new BMap.Label('起点', {
+                                        offset: new BMap.Size(20, 0)
+                                    }));
+
+                                    // 添加终点标记
+                                    const endMarker = new BMap.Marker(endPoint);
+                                    this.map.addOverlay(endMarker);
+                                    endMarker.setLabel(new BMap.Label('终点', {
+                                        offset: new BMap.Size(20, 0)
+                                    }));
+
+                                    // 规划驾驶路线
+                                    this.driving.search(startPoint, endPoint);
+                                    
+                                    // 调整地图视野
+                                    this.map.setViewport([startPoint, endPoint]);
+                                } else {
+                                    this.$refs.toast.show({
+                                        model: 'error',
+                                        label: '无法解析终点地址'
+                                    });
+                                }
+                            });
+                        } else {
+                            this.$refs.toast.show({
+                                model: 'error',
+                                label: '无法解析起点地址'
+                            });
+                        }
+                    });
+                },
+
+                clearMapOverlays() {
+                    this.map.clearOverlays();
+                    this.routeInfo = null;
+                }
+            }
+        })
+    </script>
+</body>
+</html>

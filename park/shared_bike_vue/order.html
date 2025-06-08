@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>订单管理</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .order-card {
+            margin-bottom: 20px;
+            transition: all 0.3s;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .order-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .status-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 15px;
+        }
+        .price {
+            color: #f56c6c;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .order-time {
+            color: #909399;
+            font-size: 14px;
+        }
+        .filter-btn {
+            border-radius: 20px;
+            margin: 0 5px;
+            padding: 8px 20px;
+            transition: all 0.3s;
+        }
+        .filter-btn:hover {
+            transform: translateY(-2px);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 0;
+            margin-bottom: 30px;
+            border-radius: 0 0 20px 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- 页面头部 -->
+        <div class="header">
+            <div class="container">
+                <h2>订单管理</h2>
+                <p class="mb-0">共 {{filteredOrders.length}} 个订单</p>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- 订单筛选 -->
+            <div class="row mb-4">
+                <div class="col text-center">
+                    <button class="btn filter-btn" :class="{'btn-primary': currentStatus === '', 'btn-outline-primary': currentStatus !== ''}" @click="filterByStatus('')">全部</button>
+                    <button class="btn filter-btn" :class="{'btn-primary': currentStatus === 1, 'btn-outline-primary': currentStatus !== 1}" @click="filterByStatus(1)">待支付</button>
+                    <button class="btn filter-btn" :class="{'btn-primary': currentStatus === 2, 'btn-outline-primary': currentStatus !== 2}" @click="filterByStatus(2)">已支付</button>
+                    <button class="btn filter-btn" :class="{'btn-primary': currentStatus === 3, 'btn-outline-primary': currentStatus !== 3}" @click="filterByStatus(3)">已完成</button>
+                    <button class="btn filter-btn" :class="{'btn-primary': currentStatus === 4, 'btn-outline-primary': currentStatus !== 4}" @click="filterByStatus(4)">已取消</button>
+                </div>
+            </div>
+
+            <!-- 订单列表 -->
+            <div class="row">
+                <div class="col-md-6" v-for="order in filteredOrders" :key="order.id">
+                    <div class="card order-card">
+                        <div class="card-body">
+                            <span class="badge status-badge" 
+                                  :class="{
+                                    'bg-warning': order.status === 1,
+                                    'bg-success': order.status === 2,
+                                    'bg-info': order.status === 3,
+                                    'bg-secondary': order.status === 4
+                                  }">
+                                {{getStatusText(order.status)}}
+                            </span>
+                            <h5 class="card-title mb-3">订单号：{{order.id}}</h5>
+                            <div class="card-text mb-2">
+                                <i class="bi bi-geo-alt"></i>
+                                目的地：{{order.destination}}
+                            </div>
+                            <div class="card-text mb-2">
+                                <i class="bi bi-clock"></i>
+                                骑行时长：{{order.duration}}小时
+                            </div>
+                            <div class="card-text price mb-2">￥{{order.totalCost}}</div>
+                            <div class="card-text order-time mb-3">
+                                <i class="bi bi-calendar"></i>
+                                下单时间：{{formatTime(order.createTime)}}
+                            </div>
+                            
+                            <!-- 订单操作按钮 -->
+                            <div class="mt-3" v-if="order.status === 1">
+                                <button class="btn btn-primary me-2" @click="payOrder(order.id)">
+                                    <i class="bi bi-credit-card"></i> 立即支付
+                                </button>
+                                <button class="btn btn-outline-danger" @click="cancelOrder(order.id)">
+                                    <i class="bi bi-x-circle"></i> 取消订单
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.2.31/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css"></script>
+    <script type="module">
+        import orderApi from './js/order.js'
+        
+        const { createApp, ref, computed } = Vue
+
+        createApp({
+            setup() {
+                const orders = ref([])
+                const currentStatus = ref('')
+
+                // 获取订单列表
+                const loadOrders = async () => {
+                    try {
+                        const res = await orderApi.list({})
+                        if (res.code === 200) {
+                            orders.value = res.data || []
+                        } else {
+                            console.error('获取订单列表失败:', res.msg)
+                        }
+                    } catch (error) {
+                        console.error('获取订单列表失败:', error)
+                    }
+                }
+
+                // 过滤订单
+                const filteredOrders = computed(() => {
+                    if (!currentStatus.value) return orders.value
+                    return orders.value.filter(order => order.status === currentStatus.value)
+                })
+
+                // 格式化时间
+                const formatTime = (time) => {
+                    if (!time) return ''
+                    return new Date(time).toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })
+                }
+
+                // 获取状态文本
+                const getStatusText = (status) => {
+                    const statusMap = {
+                        1: '待支付',
+                        2: '已支付',
+                        3: '已完成',
+                        4: '已取消'
+                    }
+                    return statusMap[status] || '未知状态'
+                }
+
+                // 支付订单
+                const payOrder = async (orderId) => {
+                    try {
+                        const res = await orderApi.updateStatus(orderId, 2)
+                        if (res.code === 200) {
+                            alert('支付成功！')
+                            loadOrders() // 重新加载订单列表
+                        } else {
+                            alert(res.msg || '支付失败')
+                        }
+                    } catch (error) {
+                        console.error('支付订单失败:', error)
+                        alert('支付失败，请稍后重试')
+                    }
+                }
+
+                // 取消订单
+                const cancelOrder = async (orderId) => {
+                    if (!confirm('确定要取消该订单吗？')) return
+
+                    try {
+                        const res = await orderApi.updateStatus(orderId, 4)
+                        if (res.code === 200) {
+                            alert('订单已取消')
+                            loadOrders() // 重新加载订单列表
+                        } else {
+                            alert(res.msg || '取消订单失败')
+                        }
+                    } catch (error) {
+                        console.error('取消订单失败:', error)
+                        alert('取消订单失败，请稍后重试')
+                    }
+                }
+
+                // 过滤状态
+                const filterByStatus = (status) => {
+                    currentStatus.value = status
+                }
+
+                // 初始加载
+                loadOrders()
+
+                return {
+                    orders,
+                    currentStatus,
+                    filteredOrders,
+                    formatTime,
+                    getStatusText,
+                    payOrder,
+                    cancelOrder,
+                    filterByStatus
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html> 

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>订单列表</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        .el-main {
+            padding: 20px;
+        }
+        .search-box {
+            margin-bottom: 20px;
+        }
+        .pagination {
+            margin-top: 20px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <el-container>
+            <el-main>
+                <el-card class="box-card">
+                    <div slot="header" class="clearfix">
+                        <span>订单列表</span>
+                    </div>
+                    
+                    <!-- 搜索栏 -->
+                    <div class="search-box">
+                        <el-form :inline="true" :model="queryParams">
+                            <el-form-item label="订单状态">
+                                <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
+                                    <el-option label="未支付" :value="0"></el-option>
+                                    <el-option label="已支付" :value="1"></el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item>
+                                <el-button type="primary" @click="handleQuery">查询</el-button>
+                                <el-button @click="resetQuery">重置</el-button>
+                            </el-form-item>
+                        </el-form>
+                    </div>
+
+                    <!-- 表格 -->
+                    <el-table :data="orderList" style="width: 100%" border v-loading="loading">
+                        <el-table-column prop="id" label="订单编号" width="180"></el-table-column>
+                        <el-table-column prop="startPoint" label="停车场" width="180"></el-table-column>
+                        <el-table-column prop="startPoint" label="起点"></el-table-column>
+                        <el-table-column prop="endPoint" label="终点"></el-table-column>
+                        <el-table-column prop="duration" label="预计时长(小时)" width="120"></el-table-column>
+                        <el-table-column prop="estimatedCost" label="预计费用" width="120">
+                            <template slot-scope="scope">
+                                ¥{{ scope.row.estimatedCost }}
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="createTime" label="创建时间" width="180"></el-table-column>
+                        <el-table-column prop="status" label="状态" width="100">
+                            <template slot-scope="scope">
+                                <el-tag :type="scope.row.status === 1 ? 'warning' : 'success'">
+                                    {{ scope.row.status === 1 ? '未支付' : '已支付' }}
+                                </el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="操作" width="150" fixed="right">
+                            <template slot-scope="scope">
+<!--                                <el-button-->
+<!--                                    size="mini"-->
+<!--                                    type="primary"-->
+<!--                                    @click="handlePay(scope.row)"-->
+<!--                                    v-if="scope.row.status === 0">支付</el-button>-->
+<!--                                <el-button-->
+<!--                                    size="mini"-->
+<!--                                    type="info"-->
+<!--                                    @click="handleDetail(scope.row)">详情</el-button>-->
+                            </template>
+                        </el-table-column>
+                    </el-table>
+
+                    <!-- 分页 -->
+                    <div class="pagination">
+                        <el-pagination
+                            @size-change="handleSizeChange"
+                            @current-change="handleCurrentChange"
+                            :current-page="queryParams.pageNum"
+                            :page-sizes="[10, 20, 50, 100]"
+                            :page-size="queryParams.pageSize"
+                            layout="total, sizes, prev, pager, next, jumper"
+                            :total="total">
+                        </el-pagination>
+                    </div>
+                </el-card>
+            </el-main>
+        </el-container>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    // 查询参数
+                    queryParams: {
+                        pageNum: 1,
+                        pageSize: 10,
+                        status: null
+                    },
+                    // 订单列表
+                    orderList: [],
+                    // 总记录数
+                    total: 0,
+                    // 加载状态
+                    loading: false
+                }
+            },
+            created() {
+                this.getList()
+            },
+            methods: {
+                // 获取订单列表
+                getList() {
+                    this.loading = true
+                    axios.get('http://localhost:8181/order/list', {
+                        params: this.queryParams
+                    }).then(response => {
+                        const { code, data, total, msg } = response.data
+                        if (code === 200) {
+                            this.orderList = data
+                            this.total = total
+                        } else {
+                            this.$message.error(msg || '获取订单列表失败')
+                        }
+                    }).catch(error => {
+                        console.error('获取订单列表失败:', error)
+                        this.$message.error('获取订单列表失败，请检查网络连接')
+                    }).finally(() => {
+                        this.loading = false
+                    })
+                },
+                // 查询按钮点击
+                handleQuery() {
+                    this.queryParams.pageNum = 1
+                    this.getList()
+                },
+                // 重置按钮点击
+                resetQuery() {
+                    this.queryParams = {
+                        pageNum: 1,
+                        pageSize: 10,
+                        status: null
+                    }
+                    this.getList()
+                },
+                // 每页条数改变
+                handleSizeChange(val) {
+                    this.queryParams.pageSize = val
+                    this.getList()
+                },
+                // 当前页改变
+                handleCurrentChange(val) {
+                    this.queryParams.pageNum = val
+                    this.getList()
+                },
+                // 支付按钮点击
+                handlePay(row) {
+                    this.$confirm('确认支付该订单吗？', '提示', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    }).then(() => {
+                        axios.put(`/api/order/${row.id}/pay`).then(response => {
+                            const { code, msg } = response.data
+                            if (code === 200) {
+                                this.$message.success('支付成功')
+                                this.getList()
+                            } else {
+                                this.$message.error(msg || '支付失败')
+                            }
+                        }).catch(error => {
+                            console.error('支付失败:', error)
+                            this.$message.error('支付失败，请检查网络连接')
+                        })
+                    }).catch(() => {})
+                },
+                // 详情按钮点击
+                handleDetail(row) {
+                    // 跳转到详情页面
+                    window.location.href = `/orderDetail.html?id=${row.id}`
+                }
+            }
+        })
+    </script>
+</body>
+</html>
